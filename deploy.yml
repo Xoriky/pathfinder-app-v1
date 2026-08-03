@@ -1,0 +1,151 @@
+name: Deploy Pathfinder
+
+# Triggers: every push to main (production), every PR for checks only
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: "20"
+  DENO_VERSION: "1.40.0"
+
+# ──────────────────────────────────────────────────────────────
+# JOB 1 — Lint & Type-check (runs on every PR and push)
+# ──────────────────────────────────────────────────────────────
+jobs:
+  check:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+# ──────────────────────────────────────────────────────────────
+# JOB 2 — Deploy Edge Function (push to main only)
+# ──────────────────────────────────────────────────────────────
+  deploy-edge-function:
+    name: Deploy Edge Function
+    runs-on: ubuntu-latest
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # verify_jwt = false because the function handles auth itself
+      # via supabase.auth.getUser() for full control over error shapes.
+      - name: Deploy chat-director function
+        run: supabase functions deploy chat-director --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF:  ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      # Sync secrets from GitHub to Supabase Edge Runtime.
+      # Only runs when secrets are actually present to avoid
+      # overwriting production values with empty strings.
+      - name: Sync Edge Function secrets
+        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          supabase secrets set \
+            ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            ALLOWED_ORIGIN="${{ secrets.ALLOWED_ORIGIN }}" \
+            USE_OPENAI_FALLBACK="${{ secrets.USE_OPENAI_FALLBACK || 'false' }}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF:  ${{ secrets.SUPABASE_PROJECT_REF }}
+
+# ──────────────────────────────────────────────────────────────
+# JOB 3 — Build & Deploy Frontend (push to main only)
+# Runs after the Edge Function is deployed so the frontend
+# never goes live pointing at an outdated function.
+# ──────────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: deploy-edge-function
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # These two are the ONLY Supabase values that belong in the
+          # browser bundle. The service role key is never set here.
+          VITE_SUPABASE_URL:      ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SITE_URL:          ${{ secrets.VITE_SITE_URL }}
+
+      # ── Choose your hosting provider ────────────────────────────
+      # Uncomment ONE of the blocks below.
+
+      # ── Option A: Vercel ───────────────────────────────────────
+      # Add VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID to GitHub Secrets.
+      #
+      # - name: Deploy to Vercel
+      #   run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+      #   env:
+      #     VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+      #     VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # ── Option B: Netlify ──────────────────────────────────────
+      # Add NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID to GitHub Secrets.
+      #
+      # - name: Deploy to Netlify
+      #   uses: netlify/actions/cli@master
+      #   with:
+      #     args: deploy --prod --dir=dist
+      #   env:
+      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      #     NETLIFY_SITE_ID:    ${{ secrets.NETLIFY_SITE_ID }}
+
+      # ── Option C: Cloudflare Pages ─────────────────────────────
+      # Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to GitHub Secrets.
+      #
+      # - name: Deploy to Cloudflare Pages
+      #   uses: cloudflare/pages-action@v1
+      #   with:
+      #     apiToken:   ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId:  ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     projectName: pathfinder
+      #     directory:  dist
+
+      # ── Temporary: upload dist as artifact so you can verify build ─
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pathfinder-dist
+          path: dist/
+          retention-days: 7

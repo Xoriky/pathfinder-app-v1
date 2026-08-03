@@ -1,0 +1,62 @@
+{
+  // ── Editor ────────────────────────────────────────────────────
+  "editor.formatOnSave":      true,
+  "editor.defaultFormatter":  "esbenp.prettier-vscode",
+  "editor.tabSize":           2,
+  "editor.rulers":            [100],
+  "editor.bracketPairColorization.enabled": true,
+  "files.eol":                "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+
+  // ── Language overrides ────────────────────────────────────────
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[sql]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+
+  // ── Deno — ONLY activate inside supabase/functions/ ──────────
+  // Without enablePaths, Deno's type-checker fights with the Node
+  // types used by the rest of the project.
+  "deno.enable":      false,
+  "deno.enablePaths": ["supabase/functions"],
+  "deno.unstable":    true,
+  "deno.importMap":   "./supabase/functions/import_map.json",
+
+  // ── ESLint ────────────────────────────────────────────────────
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+
+  // ── Emmet ─────────────────────────────────────────────────────
+  "emmet.includeLanguages": {
+    "javascript":  "javascriptreact",
+    "typescript":  "typescriptreact"
+  },
+
+  // ── File associations ─────────────────────────────────────────
+  "files.associations": {
+    "*.toml": "toml",
+    "*.sql":  "sql",
+    "*.env*": "dotenv"
+  },
+
+  // ── Search exclusions ─────────────────────────────────────────
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist":         true,
+    "**/.git":         true,
+    "**/supabase/.temp": true
+  }
+}

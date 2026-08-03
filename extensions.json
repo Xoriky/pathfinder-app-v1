@@ -1,0 +1,28 @@
+{
+  // ── .vscode/extensions.json ───────────────────────────────────
+  // Share this file so every team member gets the same IDE setup.
+  // VS Code will prompt to install these on first open.
+  "recommendations": [
+    // React & JS
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "formulahendry.auto-rename-tag",
+    "christian-kohler.path-intellisense",
+    "ms-vscode.vscode-typescript-next",
+
+    // Deno (Edge Functions — activates only inside supabase/functions/)
+    "denoland.vscode-deno",
+
+    // Supabase
+    "supabase.supabase-vscode",
+
+    // Git
+    "eamodio.gitlens",
+    "GitHub.vscode-pull-request-github",
+
+    // Quality-of-life
+    "streetsidesoftware.code-spell-checker",
+    "wayou.vscode-todo-highlight",
+    "ms-vsliveshare.vsliveshare"
+  ]
+}
